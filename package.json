@@ -1,0 +1,45 @@
+{
+  "name": "verifio",
+  "version": "0.1.0",
+  "description": "Smart validation and verification library for URLs, with future support for emails and more",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rimraf dist",
+    "prepare": "npm run clean && npm run build",
+    "prepublishOnly": "npm test",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\""
+  },
+  "keywords": [
+    "validation",
+    "url",
+    "verification",
+    "expander",
+    "security",
+    "check",
+    "valid",
+    "link"
+  ],
+  "author": "AashishRichhariya",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.10",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.3",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2",
+    "rimraf": "^5.0.10",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3"
+  }
+}
