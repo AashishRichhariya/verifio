@@ -17,33 +17,28 @@ export class VerifioURL {
     '(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
 
   private static readonly IPV6_PATTERN =
-    '\\[(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,7}:|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|' +
-    '[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|' +
-    ':(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|' +
-    'fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|' +
-    '::(?:ffff(?::0{1,4}){0,1}:){0,1}' +
-    '(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}' +
-    '(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|' +
-    '(?:[0-9a-fA-F]{1,4}:){1,4}:' +
-    '(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}' +
-    '(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\]';
+    '\\[' + // Opening bracket
+    '(?:' +
+    // Regular IPv6 with optional compression
+    '[0-9a-fA-F:]{2,}' +
+    '(?::[0-9a-fA-F]{1,4})*|' +
+    // IPv4-mapped IPv6
+    '::ffff:[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}' +
+    ')' +
+    '\\]'; // Closing bracket
 
   private static readonly DOMAIN_PATTERN =
-    '(?:(?:www\\.)?(?:xn--[a-zA-Z0-9]+|[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9])' +
-    `(?:\\.[a-zA-Z]{${VerifioURL.TLD_MIN_LENGTH},${VerifioURL.TLD_MAX_LENGTH}})+)`;
+    '(?:(?:(?:xn--[a-zA-Z0-9]+|[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)\\.)*' + // Multiple subdomains
+    '(?:xn--[a-zA-Z0-9]+|[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)' + // Domain name
+    `(?:\\.[a-zA-Z]{${VerifioURL.TLD_MIN_LENGTH},${VerifioURL.TLD_MAX_LENGTH}})+)`; // TLD
 
   private static readonly URL_PATTERN = new RegExp(
     '^' +
       // Protocol
       `(?:(?:${VerifioURL.PROTOCOLS.join('|')}):\\/\\/)?` +
-      // Authentication (optional)
-      '(?:[a-zA-Z0-9_-]+(?::[^@]*)?@)?' +
+      // Authentication (optional with percent-encoding)
+      '(?:[a-zA-Z0-9._~%-](?:[a-zA-Z0-9._~%-]|%[0-9a-fA-F]{2})*' +
+      '(?::[a-zA-Z0-9._~%-](?:[a-zA-Z0-9._~%-]|%[0-9a-fA-F]{2})*)?@)?' +
       // IP address or domain name
       `(?:${VerifioURL.IPV4_PATTERN}|${VerifioURL.IPV6_PATTERN}|${VerifioURL.DOMAIN_PATTERN})` +
       // Port (optional)
@@ -77,132 +72,54 @@ export class VerifioURL {
     }
 
     if (url.length > this.MAX_URL_LENGTH) {
-      errors.push({
-        code: VerifioURLErrorCode.URL_TOO_LONG,
-        message: `URL length exceeds maximum of ${this.MAX_URL_LENGTH} characters`,
-      });
       return {
         isValid: false,
-        errors,
+        errors: [
+          {
+            code: VerifioURLErrorCode.URL_TOO_LONG,
+            message: `URL length exceeds maximum of ${this.MAX_URL_LENGTH} characters`,
+          },
+        ],
       };
     }
 
+    // Try parsing the URL first
+    let urlObject: URL;
     try {
-      const urlObject = new URL(url);
-
-      // Protocol validation
-      const protocol = urlObject.protocol.replace(':', '');
-      if (!this.PROTOCOLS.includes(protocol.toLowerCase())) {
-        errors.push({
-          code: VerifioURLErrorCode.INVALID_PROTOCOL,
-          message: `Protocol '${protocol}' is not supported. Allowed protocols: ${this.PROTOCOLS.join(', ')}`,
-        });
-      }
-
-      const hostname = urlObject.hostname.replace(/^\[|\]$/g, '');
-
-      // IP Address validation
-      if (this.isIPAddress(hostname)) {
-        if (this.isIPv4Address(hostname)) {
-          if (!this.isValidIPv4Address(hostname)) {
-            errors.push({
-              code: VerifioURLErrorCode.INVALID_IP,
-              message: 'Invalid IPv4 address format',
-            });
-          }
-        } else if (!this.isValidIPv6Address(hostname)) {
-          errors.push({
-            code: VerifioURLErrorCode.INVALID_IP,
-            message: 'Invalid IPv6 address format',
-          });
-        }
-      } else {
-        // Domain validation for non-IP addresses
-        if (hostname.length > this.MAX_DOMAIN_LENGTH) {
-          errors.push({
-            code: VerifioURLErrorCode.INVALID_DOMAIN_LENGTH,
-            message: `Domain length exceeds maximum of ${this.MAX_DOMAIN_LENGTH} characters`,
-          });
-        }
-
-        // Hostname character validation
-        if (/[^a-zA-Z0-9.-]/.test(hostname)) {
-          errors.push({
-            code: VerifioURLErrorCode.INVALID_HOSTNAME_CHARS,
-            message: 'Hostname contains invalid characters',
-          });
-        }
-
-        // TLD and label validation
-        const labels = hostname.split('.');
-        if (labels.length > 0) {
-          const tld = labels[labels.length - 1];
-          if (!/^[a-zA-Z]+$/.test(tld)) {
-            errors.push({
-              code: VerifioURLErrorCode.INVALID_TLD,
-              message: 'TLD must contain only letters',
-            });
-          } else if (tld.length < this.TLD_MIN_LENGTH || tld.length > this.TLD_MAX_LENGTH) {
-            errors.push({
-              code: VerifioURLErrorCode.INVALID_TLD,
-              message: `TLD length must be between ${this.TLD_MIN_LENGTH} and ${this.TLD_MAX_LENGTH} characters`,
-            });
-          }
-        }
-
-        // Label validation
-        for (const label of labels) {
-          if (label.length > 63) {
-            errors.push({
-              code: VerifioURLErrorCode.INVALID_LABEL_LENGTH,
-              message: 'Domain label exceeds maximum length of 63 characters',
-            });
-          }
-          if (label.startsWith('-') || label.endsWith('-')) {
-            errors.push({
-              code: VerifioURLErrorCode.INVALID_LABEL_FORMAT,
-              message: 'Domain labels cannot start or end with hyphens',
-            });
-          }
-
-          // Punycode validation
-          if (label.startsWith('xn--')) {
-            if (!/^xn--[a-zA-Z0-9]+$/.test(label)) {
-              errors.push({
-                code: VerifioURLErrorCode.INVALID_PUNYCODE,
-                message: 'Invalid Punycode format in domain label',
-              });
-            }
-          } else {
-            // Regular label character validation
-            if (/[^a-zA-Z0-9-]/.test(label)) {
-              errors.push({
-                code: VerifioURLErrorCode.INVALID_HOSTNAME_CHARS,
-                message: 'Hostname contains invalid characters',
-              });
-            }
-          }
-        }
-      }
-
-      // Port validation
-      if (urlObject.port) {
-        const port = parseInt(urlObject.port);
-        if (port <= 0 || port > 65535) {
-          errors.push({
-            code: VerifioURLErrorCode.INVALID_PORT,
-            message: 'Port number must be between 1 and 65535',
-          });
-        }
-      }
-
-      if (!this.URL_PATTERN.test(url)) {
-        errors.push({
-          code: VerifioURLErrorCode.INVALID_URL,
-          message: 'URL format is invalid',
-        });
-      }
+      urlObject = new URL(url);
     } catch (error) {
+      const ipv4Match = url.match(/\/\/([0-9.]+)/);
+      const ipv6Match = url.match(/\/\/\[([0-9a-fA-F:]+)\]/);
+
+      if (ipv4Match) {
+        const ipAddress = ipv4Match[1];
+        if (!this.isIPv4Address(ipAddress)) {
+          return {
+            isValid: false,
+            errors: [
+              {
+                code: VerifioURLErrorCode.INVALID_IP,
+                message: 'Invalid IPv4 address - values must be between 0 and 255',
+              },
+            ],
+          };
+        }
+      } else if (ipv6Match) {
+        const ipAddress = ipv6Match[1];
+        if (!this.isIPv6Address(ipAddress)) {
+          return {
+            isValid: false,
+            errors: [
+              {
+                code: VerifioURLErrorCode.INVALID_IP,
+                message: 'Invalid IPv6 address format',
+              },
+            ],
+          };
+        }
+      }
+
+      // If no specific error was found, return generic malformed URL error
       return {
         isValid: false,
         errors: [
@@ -214,10 +131,124 @@ export class VerifioURL {
       };
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
+    // At this point, we have a valid URL object, so we can do additional validations
+    // Protocol validation
+    const protocol = urlObject.protocol.replace(':', '');
+    if (!this.PROTOCOLS.includes(protocol.toLowerCase())) {
+      errors.push({
+        code: VerifioURLErrorCode.INVALID_PROTOCOL,
+        message: `Protocol '${protocol}' is not supported. Allowed protocols: ${this.PROTOCOLS.join(', ')}`,
+      });
+    }
+
+    // Get hostname without brackets for IPv6
+    const hostname = urlObject.hostname.replace(/^\[|\]$/g, '');
+
+    // Check if it's an IP address
+    if (this.isIPAddress(hostname)) {
+      // Additional IP validation for edge cases that URL constructor accepts
+      if (this.isIPv4Address(hostname)) {
+        const parts = hostname.split('.');
+        const hasInvalidOctet = parts.some((part) => {
+          const num = parseInt(part, 10);
+          return num > 255 || part !== num.toString();
+        });
+        if (hasInvalidOctet) {
+          errors.push({
+            code: VerifioURLErrorCode.INVALID_IP,
+            message: 'Invalid IPv4 address format',
+          });
+        }
+      }
+    } else {
+      // Domain validation for non-IP addresses
+      if (hostname.length > this.MAX_DOMAIN_LENGTH) {
+        errors.push({
+          code: VerifioURLErrorCode.INVALID_DOMAIN_LENGTH,
+          message: `Domain length exceeds maximum of ${this.MAX_DOMAIN_LENGTH} characters`,
+        });
+      }
+
+      // Hostname character validation
+      if (/[^a-zA-Z0-9.-]/.test(hostname)) {
+        errors.push({
+          code: VerifioURLErrorCode.INVALID_HOSTNAME_CHARS,
+          message: 'Hostname contains invalid characters',
+        });
+      }
+
+      // TLD and label validation
+      const labels = hostname.split('.');
+      if (labels.length > 0) {
+        const tld = labels[labels.length - 1];
+        if (!/^[a-zA-Z]+$/.test(tld)) {
+          errors.push({
+            code: VerifioURLErrorCode.INVALID_TLD,
+            message: 'TLD must contain only letters',
+          });
+        } else if (tld.length < this.TLD_MIN_LENGTH || tld.length > this.TLD_MAX_LENGTH) {
+          errors.push({
+            code: VerifioURLErrorCode.INVALID_TLD,
+            message: `TLD length must be between ${this.TLD_MIN_LENGTH} and ${this.TLD_MAX_LENGTH} characters`,
+          });
+        }
+      }
+
+      // Label validation
+      for (const label of labels) {
+        if (label.length > 63) {
+          errors.push({
+            code: VerifioURLErrorCode.INVALID_LABEL_LENGTH,
+            message: 'Domain label exceeds maximum length of 63 characters',
+          });
+        }
+        if (label.startsWith('-') || label.endsWith('-')) {
+          errors.push({
+            code: VerifioURLErrorCode.INVALID_LABEL_FORMAT,
+            message: 'Domain labels cannot start or end with hyphens',
+          });
+        }
+
+        // Punycode validation
+        if (label.startsWith('xn--')) {
+          if (!/^xn--[a-zA-Z0-9]+-*[a-zA-Z0-9]+$/.test(label)) {
+            errors.push({
+              code: VerifioURLErrorCode.INVALID_PUNYCODE,
+              message: 'Invalid Punycode format in domain label',
+            });
+          }
+        } else {
+          // Regular label character validation
+          if (/[^a-zA-Z0-9-]/.test(label)) {
+            errors.push({
+              code: VerifioURLErrorCode.INVALID_HOSTNAME_CHARS,
+              message: 'Hostname contains invalid characters',
+            });
+          }
+        }
+      }
+    }
+
+    // Port validation
+    if (urlObject.port) {
+      const port = parseInt(urlObject.port);
+      if (port <= 0 || port > 65535) {
+        errors.push({
+          code: VerifioURLErrorCode.INVALID_PORT,
+          message: 'Port number must be between 1 and 65535',
+        });
+      }
+    }
+
+    // Final URL pattern validation
+    if (!this.URL_PATTERN.test(url)) {
+      errors.push({
+        code: VerifioURLErrorCode.INVALID_URL,
+        message: 'URL format is invalid',
+      });
+    }
+
+    return errors.length === 0 ? { isValid: true } : { isValid: false, errors };
   }
 
   /**
@@ -227,40 +258,41 @@ export class VerifioURL {
    * @returns The expanded URL or null if expansion fails
    */
   static async expand(url: string, timeoutMs: number = 5000): Promise<string | null> {
+    if (timeoutMs <= 0) {
+      throw new Error('Timeout must be greater than 0 milliseconds');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
     try {
-      if (timeoutMs <= 0) {
-        throw new Error('Timeout must be greater than 0 milliseconds');
+      const response = await fetch(url, {
+        method: 'HEAD',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-      try {
-        const response = await fetch(url, {
-          method: 'HEAD',
-          redirect: 'follow',
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        return response.url;
-      } finally {
-        clearTimeout(timeout);
-      }
+      return response.url;
     } catch (error) {
-      console.error(
-        'Error checking URL:',
-        error instanceof Error ? error.message : 'Unknown error'
-      );
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.error(`Request timed out after ${timeoutMs}ms`);
+      } else {
+        console.error(
+          'Error checking URL:',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      }
       return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
-
   /**
    * Full URL verification including expansion and accessibility check
    */
@@ -293,13 +325,18 @@ export class VerifioURL {
   }
 
   private static isIPv4Address(hostname: string): boolean {
-    return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
-  }
-
-  private static isValidIPv4Address(ip: string): boolean {
-    const parts = ip.split('.');
+    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
+      return false;
+    }
+    const parts = hostname.split('.');
+    if (parts.length !== 4) {
+      return false;
+    }
     return parts.every((part) => {
       const num = parseInt(part, 10);
+      if (part !== num.toString()) {
+        return false;
+      }
       return num >= 0 && num <= 255;
     });
   }
@@ -308,36 +345,38 @@ export class VerifioURL {
     // Remove brackets if present
     hostname = hostname.replace(/^\[|\]$/g, '');
 
-    // Split into groups
-    const parts = hostname.split(':');
-
-    // Check for proper length (8 parts, or 7 parts with ::)
-    if (parts.length > 8) return false;
-
-    // Check for :: compression
-    const hasCompression = hostname.includes('::');
-    if (hasCompression) {
-      // Only one :: allowed
-      if ((hostname.match(/::/g) || []).length > 1) return false;
-
-      // Calculate expected length with compression
-      const actualLength = parts.filter((p) => p !== '').length;
-      if (actualLength > 7) return false;
-    } else if (parts.length !== 8) {
+    if (hostname.includes(':::')) {
       return false;
     }
 
-    // Validate each part
+    const compressionMarkers = hostname.match(/::/g);
+    if (compressionMarkers && compressionMarkers.length > 1) {
+      return false;
+    }
+
+    if (hostname.endsWith(':') && !hostname.endsWith('::')) {
+      return false;
+    }
+
+    const parts = hostname.split(':');
+    const hasCompression = hostname.includes('::');
+
+    if (hasCompression) {
+      const actualSegments = parts.filter((p) => p !== '').length;
+      if (actualSegments >= 8) {
+        return false;
+      }
+    } else {
+      if (parts.length !== 8) {
+        return false;
+      }
+    }
+
     return parts.every((part) => {
-      // Empty part (part of ::)
-      if (part === '') return true;
-      // Must be 1-4 hex digits
+      if (part === '') {
+        return hasCompression;
+      }
       return /^[0-9a-fA-F]{1,4}$/.test(part);
     });
-  }
-
-  private static isValidIPv6Address(ip: string): boolean {
-    // Delegate to isIPv6Address since it already does full validation
-    return this.isIPv6Address(ip);
   }
 }
