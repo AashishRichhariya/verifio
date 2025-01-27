@@ -1,3 +1,4 @@
+import { URLHelper } from './helper';
 import {
   VerifioURLResult,
   VerifioURLValidityResult,
@@ -6,52 +7,6 @@ import {
 } from './types';
 
 export class VerifioURL {
-  private static readonly PROTOCOLS = ['http', 'https', 'ftp', 'sftp'];
-  private static readonly TLD_MIN_LENGTH = 2;
-  private static readonly TLD_MAX_LENGTH = 63;
-  private static readonly MAX_DOMAIN_LENGTH = 255;
-  private static readonly MAX_URL_LENGTH = 2083;
-
-  // Split regex into parts for better maintainability
-  private static readonly IPV4_PATTERN =
-    '(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)';
-
-  private static readonly IPV6_PATTERN =
-    '\\[' + // Opening bracket
-    '(?:' +
-    // Regular IPv6 with optional compression
-    '[0-9a-fA-F:]{2,}' +
-    '(?::[0-9a-fA-F]{1,4})*|' +
-    // IPv4-mapped IPv6
-    '::ffff:[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}' +
-    ')' +
-    '\\]'; // Closing bracket
-
-  private static readonly DOMAIN_PATTERN =
-    '(?:(?:(?:xn--[a-zA-Z0-9]+|[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)\\.)*' + // Multiple subdomains
-    '(?:xn--[a-zA-Z0-9]+|[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)' + // Domain name
-    `(?:\\.[a-zA-Z]{${VerifioURL.TLD_MIN_LENGTH},${VerifioURL.TLD_MAX_LENGTH}})+)`; // TLD
-
-  private static readonly URL_PATTERN = new RegExp(
-    '^' +
-      // Protocol
-      `(?:(?:${VerifioURL.PROTOCOLS.join('|')}):\\/\\/)?` +
-      // Authentication (optional with percent-encoding)
-      '(?:[a-zA-Z0-9._~%-](?:[a-zA-Z0-9._~%-]|%[0-9a-fA-F]{2})*' +
-      '(?::[a-zA-Z0-9._~%-](?:[a-zA-Z0-9._~%-]|%[0-9a-fA-F]{2})*)?@)?' +
-      // IP address or domain name
-      `(?:${VerifioURL.IPV4_PATTERN}|${VerifioURL.IPV6_PATTERN}|${VerifioURL.DOMAIN_PATTERN})` +
-      // Port (optional)
-      '(?::[1-9][0-9]{0,4})?' +
-      // Path (optional)
-      "(?:\\/(?:[!$&'()*+,;=\\-._~:@\\/a-zA-Z0-9%])*)*" +
-      // Query (optional)
-      "(?:\\?(?:[!$&'()*+,;=\\-._~:@\\/a-zA-Z0-9%=&]*)?)?" +
-      // Fragment (optional)
-      "(?:#(?:[!$&'()*+,;=\\-._~:@\\/a-zA-Z0-9%])*)?$",
-    'i'
-  );
-
   /**
    * Validates a URL and returns detailed results
    */
@@ -71,13 +26,13 @@ export class VerifioURL {
       };
     }
 
-    if (url.length > this.MAX_URL_LENGTH) {
+    if (url.length > URLHelper.MAX_URL_LENGTH) {
       return {
         isValid: false,
         errors: [
           {
             code: VerifioURLErrorCode.URL_TOO_LONG,
-            message: `URL length exceeds maximum of ${this.MAX_URL_LENGTH} characters`,
+            message: `URL length exceeds maximum of ${URLHelper.MAX_URL_LENGTH} characters`,
           },
         ],
       };
@@ -93,7 +48,7 @@ export class VerifioURL {
 
       if (ipv4Match) {
         const ipAddress = ipv4Match[1];
-        if (!this.isIPv4Address(ipAddress)) {
+        if (!URLHelper.isIPv4Address(ipAddress)) {
           return {
             isValid: false,
             errors: [
@@ -106,7 +61,7 @@ export class VerifioURL {
         }
       } else if (ipv6Match) {
         const ipAddress = ipv6Match[1];
-        if (!this.isIPv6Address(ipAddress)) {
+        if (!URLHelper.isIPv6Address(ipAddress)) {
           return {
             isValid: false,
             errors: [
@@ -134,10 +89,10 @@ export class VerifioURL {
     // At this point, we have a valid URL object, so we can do additional validations
     // Protocol validation
     const protocol = urlObject.protocol.replace(':', '');
-    if (!this.PROTOCOLS.includes(protocol.toLowerCase())) {
+    if (!URLHelper.PROTOCOLS.includes(protocol.toLowerCase())) {
       errors.push({
         code: VerifioURLErrorCode.INVALID_PROTOCOL,
-        message: `Protocol '${protocol}' is not supported. Allowed protocols: ${this.PROTOCOLS.join(', ')}`,
+        message: `Protocol '${protocol}' is not supported. Allowed protocols: ${URLHelper.PROTOCOLS.join(', ')}`,
       });
     }
 
@@ -145,9 +100,9 @@ export class VerifioURL {
     const hostname = urlObject.hostname.replace(/^\[|\]$/g, '');
 
     // Check if it's an IP address
-    if (this.isIPAddress(hostname)) {
+    if (URLHelper.isIPAddress(hostname)) {
       // Additional IP validation for edge cases that URL constructor accepts
-      if (this.isIPv4Address(hostname)) {
+      if (URLHelper.isIPv4Address(hostname)) {
         const parts = hostname.split('.');
         const hasInvalidOctet = parts.some((part) => {
           const num = parseInt(part, 10);
@@ -162,10 +117,10 @@ export class VerifioURL {
       }
     } else {
       // Domain validation for non-IP addresses
-      if (hostname.length > this.MAX_DOMAIN_LENGTH) {
+      if (hostname.length > URLHelper.MAX_DOMAIN_LENGTH) {
         errors.push({
           code: VerifioURLErrorCode.INVALID_DOMAIN_LENGTH,
-          message: `Domain length exceeds maximum of ${this.MAX_DOMAIN_LENGTH} characters`,
+          message: `Domain length exceeds maximum of ${URLHelper.MAX_DOMAIN_LENGTH} characters`,
         });
       }
 
@@ -186,10 +141,10 @@ export class VerifioURL {
             code: VerifioURLErrorCode.INVALID_TLD,
             message: 'TLD must contain only letters',
           });
-        } else if (tld.length < this.TLD_MIN_LENGTH || tld.length > this.TLD_MAX_LENGTH) {
+        } else if (tld.length < URLHelper.TLD_MIN_LENGTH || tld.length > URLHelper.TLD_MAX_LENGTH) {
           errors.push({
             code: VerifioURLErrorCode.INVALID_TLD,
-            message: `TLD length must be between ${this.TLD_MIN_LENGTH} and ${this.TLD_MAX_LENGTH} characters`,
+            message: `TLD length must be between ${URLHelper.TLD_MIN_LENGTH} and ${URLHelper.TLD_MAX_LENGTH} characters`,
           });
         }
       }
@@ -241,7 +196,7 @@ export class VerifioURL {
     }
 
     // Final URL pattern validation
-    if (!this.URL_PATTERN.test(url)) {
+    if (!URLHelper.URL_PATTERN.test(url)) {
       errors.push({
         code: VerifioURLErrorCode.INVALID_URL,
         message: 'URL format is invalid',
@@ -317,66 +272,5 @@ export class VerifioURL {
     }
 
     return result;
-  }
-
-  // Updated helper methods
-  private static isIPAddress(hostname: string): boolean {
-    return this.isIPv4Address(hostname) || this.isIPv6Address(hostname);
-  }
-
-  private static isIPv4Address(hostname: string): boolean {
-    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname)) {
-      return false;
-    }
-    const parts = hostname.split('.');
-    if (parts.length !== 4) {
-      return false;
-    }
-    return parts.every((part) => {
-      const num = parseInt(part, 10);
-      if (part !== num.toString()) {
-        return false;
-      }
-      return num >= 0 && num <= 255;
-    });
-  }
-
-  private static isIPv6Address(hostname: string): boolean {
-    // Remove brackets if present
-    hostname = hostname.replace(/^\[|\]$/g, '');
-
-    if (hostname.includes(':::')) {
-      return false;
-    }
-
-    const compressionMarkers = hostname.match(/::/g);
-    if (compressionMarkers && compressionMarkers.length > 1) {
-      return false;
-    }
-
-    if (hostname.endsWith(':') && !hostname.endsWith('::')) {
-      return false;
-    }
-
-    const parts = hostname.split(':');
-    const hasCompression = hostname.includes('::');
-
-    if (hasCompression) {
-      const actualSegments = parts.filter((p) => p !== '').length;
-      if (actualSegments >= 8) {
-        return false;
-      }
-    } else {
-      if (parts.length !== 8) {
-        return false;
-      }
-    }
-
-    return parts.every((part) => {
-      if (part === '') {
-        return hasCompression;
-      }
-      return /^[0-9a-fA-F]{1,4}$/.test(part);
-    });
   }
 }
