@@ -703,4 +703,196 @@ describe('VerifioURL', () => {
       });
     });
   });
+
+  describe('VerifioURL IP Address Validation', () => {
+    describe('isIPv4Address', () => {
+      const validIPv4Cases = [
+        // Standard cases
+        { input: '192.168.1.1', desc: 'typical local IP' },
+        { input: '127.0.0.1', desc: 'localhost' },
+        { input: '0.0.0.0', desc: 'all zeros' },
+        { input: '255.255.255.255', desc: 'all max values' },
+        { input: '1.2.3.4', desc: 'simple numbers' },
+
+        // Edge cases with valid numbers
+        { input: '0.0.0.1', desc: 'minimum values with last digit' },
+        { input: '100.100.100.100', desc: 'same numbers' },
+        { input: '172.16.254.1', desc: 'private network address' },
+        { input: '224.0.0.1', desc: 'multicast address' },
+        { input: '169.254.0.1', desc: 'link-local address' },
+
+        // Boundary value cases
+        { input: '0.0.0.0', desc: 'minimum possible value' },
+        { input: '255.255.255.255', desc: 'maximum possible value' },
+        { input: '1.255.255.255', desc: 'first octet maximum' },
+        { input: '255.1.255.255', desc: 'second octet maximum' },
+        { input: '255.255.1.255', desc: 'third octet maximum' },
+        { input: '255.255.255.1', desc: 'fourth octet maximum' },
+      ];
+
+      const invalidIPv4Cases = [
+        // Format errors
+        { input: '192.168.1', desc: 'missing octet' },
+        { input: '192.168.1.', desc: 'trailing dot' },
+        { input: '.192.168.1', desc: 'leading dot' },
+        { input: '192.168.1.1.', desc: 'extra trailing dot' },
+        { input: '192.168..1', desc: 'empty octet' },
+        { input: '192.168.1.1.1', desc: 'extra octet' },
+
+        // Invalid characters
+        { input: '192.168.1.1a', desc: 'alphanumeric' },
+        { input: 'a.b.c.d', desc: 'letters' },
+        { input: '192.168.1.1/24', desc: 'CIDR notation' },
+        { input: '192.168.1.-1', desc: 'negative number' },
+        { input: '192.168.1.+1', desc: 'plus sign' },
+        { input: '192.168.1.1e0', desc: 'scientific notation' },
+
+        // Invalid values
+        { input: '256.1.2.3', desc: 'first octet exceeds max' },
+        { input: '1.256.2.3', desc: 'second octet exceeds max' },
+        { input: '1.2.256.3', desc: 'third octet exceeds max' },
+        { input: '1.2.3.256', desc: 'fourth octet exceeds max' },
+        { input: '300.300.300.300', desc: 'all octets exceed max' },
+        { input: '-1.2.3.4', desc: 'negative first octet' },
+        { input: '1.-2.3.4', desc: 'negative second octet' },
+
+        // Whitespace case
+        { input: '192. 168.1.1', desc: 'space between octets' },
+
+        // Malformed strings
+        { input: '192.168.1.1\n', desc: 'newline character' },
+        { input: '192.168.1.1\t', desc: 'tab character' },
+        { input: '192.168.1.1\r', desc: 'carriage return' },
+        { input: '192,168,1,1', desc: 'commas instead of dots' },
+        { input: '192_168_1_1', desc: 'underscores instead of dots' },
+
+        // Invalid number formats
+        { input: '192.168.1.1.', desc: 'trailing dot' },
+        { input: '192.168.01.1', desc: 'octal-like number' },
+        { input: '192.168.0x1.1', desc: 'hexadecimal-like number' },
+        { input: '192.168.1.1e0', desc: 'scientific notation' },
+        { input: '192.168.001.001', desc: 'numbers with leading zeros' },
+        { input: '010.000.000.001', desc: 'all segments with leading zeros' },
+
+        // Empty or invalid input
+        { input: '', desc: 'empty string' },
+        { input: ' ', desc: 'space only' },
+        { input: '...', desc: 'dots only' },
+        { input: '192.168.1', desc: 'incomplete address' },
+        { input: '192.168.1.', desc: 'incomplete final octet' },
+      ];
+
+      test.each(validIPv4Cases)('should validate correct IPv4: $desc', ({ input }) => {
+        expect(VerifioURL.isIPv4Address(input)).toBe(true);
+      });
+
+      test.each(invalidIPv4Cases)('should invalidate incorrect IPv4: $desc', ({ input }) => {
+        expect(VerifioURL.isIPv4Address(input)).toBe(false);
+      });
+    });
+
+    describe('isIPv6Address', () => {
+      const validIPv6Cases = [
+        // Standard cases
+        { input: '2001:0db8:85a3:0000:0000:8a2e:0370:7334', desc: 'full address' },
+        { input: '::1', desc: 'localhost' },
+        { input: '::', desc: 'unspecified address' },
+
+        // Compressed cases
+        { input: '2001:db8:85a3::8a2e:370:7334', desc: 'middle compression' },
+        { input: '::ffff:192.168.1.1', desc: 'IPv4-mapped address' },
+        { input: '::ffff:c000:0280', desc: 'IPv4-mapped in hex' },
+        { input: '2001:db8::', desc: 'trailing compression' },
+        { input: '::1234:5678', desc: 'leading compression' },
+        { input: '2001::7334', desc: 'middle compression with single group' },
+
+        // Mixed cases
+        { input: '2001:0db8:85a3::8a2e:0:0', desc: 'mixed compression and zeros' },
+        { input: '::ffff:0:0', desc: 'leading compression with zeros' },
+        { input: '2001:db8::1:0:0:1', desc: 'mixed compression and ones' },
+
+        // Case variations
+        { input: '2001:DB8:85A3:0000:0000:8A2E:0370:7334', desc: 'uppercase' },
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370:7334', desc: 'lowercase' },
+        { input: '2001:Db8:85A3:0000:0000:8a2E:0370:7334', desc: 'mixed case' },
+
+        // Leading zeros
+        { input: '2001:0db8:0000:0000:0001:0000:0000:0001', desc: 'multiple leading zeros' },
+        { input: '0000:0000:0000:0000:0000:0000:0000:0001', desc: 'all leading zeros' },
+
+        // Special addresses
+        { input: 'fe80::1', desc: 'link-local address' },
+        { input: 'ff02::1', desc: 'multicast address' },
+        { input: '2001:db8::', desc: 'documentation prefix' },
+      ];
+
+      const invalidIPv6Cases = [
+        // Format errors
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370', desc: 'too few segments' },
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370:7334:7334', desc: 'too many segments' },
+        { input: '2001:db8::85a3::8a2e:0370:7334', desc: 'multiple compression markers' },
+        { input: '2001:db8:::8a2e:0370:7334', desc: 'invalid compression' },
+
+        // Invalid characters
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370:733g', desc: 'invalid hex digit' },
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370:733.', desc: 'invalid punctuation' },
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370:-7334', desc: 'negative number' },
+        { input: '2001:db8:85a3:0000:0000:8a2e:0370:+7334', desc: 'plus sign' },
+
+        // Invalid segment lengths
+        { input: '2001:db8:85a3:00000:0000:8a2e:0370:7334', desc: 'segment too long' },
+        { input: '2001:db8:85a3:0:0:8a2e:0370:7334:', desc: 'trailing colon' },
+        { input: ':2001:db8:85a3:0000:0000:8a2e:0370:7334', desc: 'leading colon' },
+
+        // Whitespace case
+        { input: '2001:db8:85a3:0000 :0000:8a2e:0370:7334', desc: 'space between segments' },
+
+        // Malformed compression
+        { input: '2001::db8::0370:7334', desc: 'multiple double colons' },
+        { input: '2001:::db8:0370:7334', desc: 'triple colon' },
+        { input: ':::', desc: 'too many colons' },
+
+        // Invalid IPv4-mapped addresses
+        { input: '::ffff:256.256.256.256', desc: 'invalid IPv4 in mapped address' },
+        { input: '::ffff:192.168.1', desc: 'incomplete IPv4 in mapped address' },
+        { input: '::ffff:192.168.1.1.1', desc: 'malformed IPv4 in mapped address' },
+
+        // Empty or invalid input
+        { input: '', desc: 'empty string' },
+        { input: ' ', desc: 'space only' },
+        { input: ':', desc: 'single colon' },
+        { input: '2001', desc: 'single segment' },
+        { input: '2001:', desc: 'incomplete address with colon' },
+      ];
+
+      test.each(validIPv6Cases)('should validate correct IPv6: $desc', ({ input }) => {
+        expect(VerifioURL.isIPv6Address(input)).toBe(true);
+      });
+
+      test.each(invalidIPv6Cases)('should invalidate incorrect IPv6: $desc', ({ input }) => {
+        expect(VerifioURL.isIPv6Address(input)).toBe(false);
+      });
+    });
+
+    describe('isIPAddress', () => {
+      test('should validate IPv4 addresses', () => {
+        expect(VerifioURL.isIPAddress('192.168.1.1')).toBe(true);
+        expect(VerifioURL.isIPAddress('0.0.0.0')).toBe(true);
+        expect(VerifioURL.isIPAddress('255.255.255.255')).toBe(true);
+      });
+
+      test('should validate IPv6 addresses', () => {
+        expect(VerifioURL.isIPAddress('2001:0db8:85a3:0000:0000:8a2e:0370:7334')).toBe(true);
+        expect(VerifioURL.isIPAddress('::1')).toBe(true);
+        expect(VerifioURL.isIPAddress('::')).toBe(true);
+      });
+
+      test('should invalidate incorrect IP addresses', () => {
+        expect(VerifioURL.isIPAddress('')).toBe(false);
+        expect(VerifioURL.isIPAddress('not-an-ip')).toBe(false);
+        expect(VerifioURL.isIPAddress('256.256.256.256')).toBe(false);
+        expect(VerifioURL.isIPAddress('2001:db8::85a3::8a2e:0370:7334')).toBe(false);
+      });
+    });
+  });
 });

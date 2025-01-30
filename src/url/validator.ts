@@ -10,6 +10,100 @@ import {
 
 export class VerifioURL {
   /**
+   * Checks if a given string is a valid IPv4 address
+   * @param address The string to check
+   * @returns boolean indicating if the string is a valid IPv4 address
+   */
+  static isIPv4Address(address: string): boolean {
+    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(address)) {
+      return false;
+    }
+    const parts = address.split('.');
+    if (parts.length !== 4) {
+      return false;
+    }
+    return parts.every((part) => {
+      const num = parseInt(part, 10);
+      if (part !== num.toString()) {
+        return false;
+      }
+      return num >= 0 && num <= 255;
+    });
+  }
+
+  /**
+   * Checks if a given string is a valid IPv6 address
+   * @param address The string to check
+   * @returns boolean indicating if the string is a valid IPv6 address
+   */
+  static isIPv6Address(address: string): boolean {
+    // Remove brackets if present
+    address = address.replace(/^\[|\]$/g, '');
+
+    if (address.includes(':::')) {
+      return false;
+    }
+
+    // Special handling for IPv4-mapped IPv6 addresses
+    if (address.toLowerCase().includes('::ffff:')) {
+      const [ipv6Part, ipv4Part] = address.split('::ffff:');
+
+      // Check if we have an IPv4 part
+      if (!ipv4Part) {
+        return false;
+      }
+
+      // If it looks like an IPv4 address, validate it as one
+      if (ipv4Part.includes('.')) {
+        if (!this.isIPv4Address(ipv4Part)) {
+          return false;
+        }
+        // Replace the IPv4 part with a placeholder for IPv6 validation
+        address = ipv6Part + '::ffff:0:0';
+      }
+    }
+
+    const compressionMarkers = address.match(/::/g);
+    if (compressionMarkers && compressionMarkers.length > 1) {
+      return false;
+    }
+
+    if (address.endsWith(':') && !address.endsWith('::')) {
+      return false;
+    }
+
+    const parts = address.split(':');
+    const hasCompression = address.includes('::');
+
+    if (hasCompression) {
+      const actualSegments = parts.filter((p) => p !== '').length;
+      if (actualSegments >= 8) {
+        return false;
+      }
+    } else {
+      if (parts.length !== 8) {
+        return false;
+      }
+    }
+
+    return parts.every((part) => {
+      if (part === '') {
+        return hasCompression;
+      }
+      return /^[0-9a-fA-F]{1,4}$/.test(part);
+    });
+  }
+
+  /**
+   * Checks if a given string is either a valid IPv4 or IPv6 address
+   * @param address The string to check
+   * @returns boolean indicating if the string is a valid IP address
+   */
+  static isIPAddress(address: string): boolean {
+    return this.isIPv4Address(address) || this.isIPv6Address(address);
+  }
+
+  /**
    * Validates a URL and returns detailed results
    */
   static isValid(url: string): VerifioURLValidityResult {
@@ -50,7 +144,7 @@ export class VerifioURL {
 
       if (ipv4Match) {
         const ipAddress = ipv4Match[1];
-        if (!URLHelper.isIPv4Address(ipAddress)) {
+        if (!this.isIPv4Address(ipAddress)) {
           return {
             isValid: false,
             errors: [
@@ -63,7 +157,7 @@ export class VerifioURL {
         }
       } else if (ipv6Match) {
         const ipAddress = ipv6Match[1];
-        if (!URLHelper.isIPv6Address(ipAddress)) {
+        if (!this.isIPv6Address(ipAddress)) {
           return {
             isValid: false,
             errors: [
@@ -102,9 +196,9 @@ export class VerifioURL {
     const hostname = urlObject.hostname.replace(/^\[|\]$/g, '');
 
     // Check if it's an IP address
-    if (URLHelper.isIPAddress(hostname)) {
+    if (this.isIPAddress(hostname)) {
       // Additional IP validation for edge cases that URL constructor accepts
-      if (URLHelper.isIPv4Address(hostname)) {
+      if (this.isIPv4Address(hostname)) {
         const parts = hostname.split('.');
         const hasInvalidOctet = parts.some((part) => {
           const num = parseInt(part, 10);
