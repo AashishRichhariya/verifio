@@ -11,8 +11,11 @@ import {
 export class VerifioURL {
   /**
    * Checks if a given string is a valid IPv4 address
-   * @param address The string to check
-   * @returns boolean indicating if the string is a valid IPv4 address
+   * @param {string} address - The string to check
+   * @returns {boolean} True if the string is a valid IPv4 address, false otherwise
+   * @example
+   * VerifioURL.isIPv4Address('192.168.1.1') // returns true
+   * VerifioURL.isIPv4Address('256.1.2.3') // returns false
    */
   static isIPv4Address(address: string): boolean {
     const trimmedAddress = address.trim();
@@ -34,8 +37,12 @@ export class VerifioURL {
 
   /**
    * Checks if a given string is a valid IPv6 address
-   * @param address The string to check
-   * @returns boolean indicating if the string is a valid IPv6 address
+   * @param {string} address - The string to check
+   * @returns {boolean} True if the string is a valid IPv6 address, false otherwise
+   * @example
+   * VerifioURL.isIPv6Address('2001:0db8:85a3:0000:0000:8a2e:0370:7334') // returns true
+   * VerifioURL.isIPv6Address('2001:0db8:85a3:0000') // returns false
+   * VerifioURL.isIPv6Address('::ffff:192.168.1.1') // returns true
    */
   static isIPv6Address(address: string): boolean {
     // Trim and remove brackets if present
@@ -97,8 +104,13 @@ export class VerifioURL {
 
   /**
    * Checks if a given string is either a valid IPv4 or IPv6 address
-   * @param address The string to check
-   * @returns boolean indicating if the string is a valid IP address
+   * @param {string} address - The string to check
+   * @returns {boolean} True if the string is either a valid IPv4 or IPv6 address
+   * @example
+   * VerifioURL.isIPAddress('192.168.1.1') // returns true
+   * VerifioURL.isIPAddress('2001:0db8::1') // returns true
+   * VerifioURL.isIPAddress('256.256.256.256') // returns false
+   * VerifioURL.isIPAddress('2001:xyz::1') // returns false
    */
   static isIPAddress(address: string): boolean {
     const trimmedAddress = address.trim();
@@ -106,7 +118,11 @@ export class VerifioURL {
   }
 
   /**
-   * Validates a URL and returns detailed results
+   * Validates a URL and returns detailed results including any validation errors
+   * @param {string} url - The URL to validate
+   * @returns {VerifioURLValidityResult} Object containing validation results and any errors
+   * @example
+   * VerifioURL.isValid('https://example.com ') // returns { isValid: true, normalizedURL: 'https://example.com' }
    */
   static isValid(url: string): VerifioURLValidityResult {
     const trimmedURL = url.trim();
@@ -311,10 +327,13 @@ export class VerifioURL {
   }
 
   /**
-   * Expands a shortened URL to its full form
-   * @param url The URL to expand
-   * @param timeoutMs The timeout in milliseconds (default: 5000)
-   * @returns The expanded URL or null if expansion fails
+   * Expands a shortened URL to its full form by following redirects
+   * @param {string} url - The URL to expand
+   * @param {number} [timeoutMs=5000] - The timeout in milliseconds for the request
+   * @returns {Promise<string | null>} The expanded URL if successful, null if expansion fails
+   * @throws {Error} If timeout value is invalid
+   * @example
+   * await VerifioURL.expand('https://bit.ly/xyz') // returns 'https://example.com/full-url'
    */
   static async expand(url: string, timeoutMs: number = 5000): Promise<string | null> {
     const trimmedURL = url.trim();
@@ -353,8 +372,19 @@ export class VerifioURL {
       clearTimeout(timeoutId);
     }
   }
+
   /**
-   * Full URL verification including expansion and accessibility check
+   * Performs comprehensive URL verification including validation, expansion, and accessibility check
+   * @param {string} url - The URL to verify
+   * @returns {Promise<VerifioURLResult>} Complete verification results including validity, expansion, and accessibility
+   * @example
+   * await VerifioURL.verify('https://example.com')
+   * // returns {
+   * //   originalURL: 'https://example.com',
+   * //   validity: { isValid: true },
+   * //   expandedURL: 'https://example.com',
+   * //   isAccessible: true
+   * // }
    */
   static async verify(url: string): Promise<VerifioURLResult> {
     const trimmedURL = url.trim();
@@ -381,9 +411,24 @@ export class VerifioURL {
   }
 
   /**
-   * Extracts domain information from a URL
-   * @param url The URL to extract domain from
-   * @returns Promise<VerifloDomainResult>
+   * Extracts and validates the domain from a URL. For shortened URLs (e.g., bit.ly links),
+   * the URL will first be expanded to get the final destination domain.
+   * @param {string} url - The URL to extract domain from
+   * @returns {Promise<VerifioDomainResult>} Object containing the extracted domain or error information
+   * @example
+   * // Regular URL
+   * await VerifioURL.extractDomain('https://sub.example.com/path')
+   * // returns {
+   * //   success: true,
+   * //   domain: 'sub.example.com'
+   * // }
+   *
+   * // Shortened URL
+   * await VerifioURL.extractDomain('https://bit.ly/xyz')
+   * // returns {
+   * //   success: true,
+   * //   domain: 'example.com'  // domain from expanded URL
+   * // }
    */
   static async extractDomain(url: string): Promise<VerifioDomainResult> {
     const trimmedURL = url.trim();
