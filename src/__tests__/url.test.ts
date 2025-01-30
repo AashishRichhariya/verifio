@@ -1,4 +1,9 @@
-import { VerifioURL, VerifioURLErrorCode, VerifioURLValidityResult } from '..';
+import {
+  VerifioURL,
+  VerifioURLErrorCode,
+  VerifioURLValidityResult,
+  VerifioDomainErrorCode,
+} from '..';
 
 // Mock fetch for expansion tests
 global.fetch = jest.fn();
@@ -516,6 +521,186 @@ describe('VerifioURL', () => {
       expect(result.validity.errors).toBeUndefined();
       expect(result.isAccessible).toBe(false);
       expect(result.expandedURL).toBeUndefined();
+    });
+  });
+
+  describe('extractDomain', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      (console.error as jest.Mock).mockRestore();
+    });
+
+    describe('Basic Domain Extraction', () => {
+      const validCases = [
+        {
+          input: 'https://example.com',
+          expected: 'example.com',
+          desc: 'simple domain',
+        },
+        {
+          input: 'http://sub.example.com',
+          expected: 'sub.example.com',
+          desc: 'subdomain',
+        },
+        {
+          input: 'https://sub1.sub2.example.co.uk',
+          expected: 'sub1.sub2.example.co.uk',
+          desc: 'multiple subdomains',
+        },
+        {
+          input: 'https://example.com:8080',
+          expected: 'example.com',
+          desc: 'domain with port',
+        },
+        {
+          input: 'https://example.com/path?query=value#fragment',
+          expected: 'example.com',
+          desc: 'domain with path, query and fragment',
+        },
+      ];
+
+      test.each(validCases)('should extract $desc: $input', async ({ input, expected }) => {
+        const result = await VerifioURL.extractDomain(input);
+        expect(result.success).toBe(true);
+        expect(result.domain).toBe(expected);
+        expect(result.error).toBeUndefined();
+      });
+    });
+
+    describe('IP Address Extraction', () => {
+      const ipCases = [
+        {
+          input: 'http://192.168.1.1',
+          expected: '192.168.1.1',
+          desc: 'IPv4 address',
+        },
+        {
+          input: 'https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]',
+          expected: '2001:db8:85a3::8a2e:370:7334',
+          desc: 'full IPv6 address',
+        },
+        {
+          input: 'https://[::1]',
+          expected: '::1',
+          desc: 'localhost IPv6',
+        },
+        {
+          input: 'https://[::ffff:192.0.2.1]',
+          expected: '::ffff:c000:201',
+          desc: 'IPv4-mapped IPv6 address',
+        },
+      ];
+
+      test.each(ipCases)('should extract $desc: $input', async ({ input, expected }) => {
+        const result = await VerifioURL.extractDomain(input);
+        expect(result.success).toBe(true);
+        expect(result.domain).toBe(expected);
+        expect(result.error).toBeUndefined();
+      });
+    });
+
+    describe('URL Shortener Cases', () => {
+      test('should extract domain from expanded URL', async () => {
+        const shortUrl = 'https://bit.ly/abc123';
+        const expandedUrl = 'https://example.com/full-path';
+
+        (global.fetch as jest.Mock).mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            url: expandedUrl,
+          })
+        );
+
+        const result = await VerifioURL.extractDomain(shortUrl);
+        expect(result.success).toBe(true);
+        expect(result.domain).toBe('example.com');
+        expect(result.error).toBeUndefined();
+      });
+
+      test('should fall back to original domain if expansion fails', async () => {
+        const shortUrl = 'https://bit.ly/invalid';
+
+        (global.fetch as jest.Mock).mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: false,
+            status: 404,
+          })
+        );
+
+        const result = await VerifioURL.extractDomain(shortUrl);
+        expect(result.success).toBe(true);
+        expect(result.domain).toBe('bit.ly');
+        expect(result.error).toBeUndefined();
+      });
+    });
+
+    describe('Error Cases', () => {
+      const invalidCases = [
+        {
+          input: '',
+          errorCode: VerifioDomainErrorCode.INVALID_URL,
+          desc: 'empty string',
+        },
+        {
+          input: 'not-a-url',
+          errorCode: VerifioDomainErrorCode.INVALID_URL,
+          desc: 'malformed URL',
+        },
+        {
+          input: 'http://',
+          errorCode: VerifioDomainErrorCode.INVALID_URL,
+          desc: 'protocol only',
+        },
+        {
+          input: 'http://[invalid-ipv6]',
+          errorCode: VerifioDomainErrorCode.INVALID_URL,
+          desc: 'invalid IPv6',
+        },
+        {
+          input: 'http://256.256.256.256',
+          errorCode: VerifioDomainErrorCode.INVALID_URL,
+          desc: 'invalid IPv4',
+        },
+        {
+          input: 'https://' + 'a'.repeat(256) + '.com',
+          errorCode: VerifioDomainErrorCode.INVALID_URL,
+          desc: 'domain too long',
+        },
+      ];
+
+      test.each(invalidCases)('should handle $desc', async ({ input, errorCode }) => {
+        const result = await VerifioURL.extractDomain(input);
+        expect(result.success).toBe(false);
+        expect(result.domain).toBeUndefined();
+        expect(result.error).toBeDefined();
+        expect(result.error?.code).toBe(errorCode);
+      });
+    });
+
+    describe('Internationalized Domain Names (IDN)', () => {
+      const idnCases = [
+        {
+          input: 'https://xn--mnchen-3ya.de',
+          expected: 'xn--mnchen-3ya.de',
+          desc: 'Punycode domain',
+        },
+        {
+          input: 'https://xn--bcher-kva.example.com',
+          expected: 'xn--bcher-kva.example.com',
+          desc: 'Punycode subdomain',
+        },
+      ];
+
+      test.each(idnCases)('should extract $desc: $input', async ({ input, expected }) => {
+        const result = await VerifioURL.extractDomain(input);
+        expect(result.success).toBe(true);
+        expect(result.domain).toBe(expected);
+        expect(result.error).toBeUndefined();
+      });
     });
   });
 });

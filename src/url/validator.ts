@@ -4,6 +4,8 @@ import {
   VerifioURLValidityResult,
   VerifioURLError,
   VerifioURLErrorCode,
+  VerifioDomainResult,
+  VerifioDomainErrorCode,
 } from './types';
 
 export class VerifioURL {
@@ -272,5 +274,61 @@ export class VerifioURL {
     }
 
     return result;
+  }
+
+  /**
+   * Extracts domain information from a URL
+   * @param url The URL to extract domain from
+   * @returns Promise<VerifloDomainResult>
+   */
+  static async extractDomain(url: string): Promise<VerifioDomainResult> {
+    try {
+      // First verify the URL
+      const verificationResult = await this.verify(url);
+
+      // If URL is invalid, return early with error
+      if (!verificationResult.validity.isValid) {
+        return {
+          success: false,
+          error: {
+            code: VerifioDomainErrorCode.INVALID_URL,
+            message: verificationResult.validity.errors?.[0]?.message || 'Invalid URL',
+          },
+        };
+      }
+
+      // Try to use the expanded URL first, fall back to original URL
+      const urlToProcess = verificationResult.expandedURL || verificationResult.originalURL;
+
+      try {
+        // Create URL object to extract hostname
+        const urlObject = new URL(urlToProcess);
+
+        // Get hostname and remove any brackets (for IPv6)
+        const hostname = urlObject.hostname.replace(/^\[|\]$/g, '');
+
+        // Return the extracted domain
+        return {
+          success: true,
+          domain: hostname,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            code: VerifioDomainErrorCode.DOMAIN_PARSE_ERROR,
+            message: error instanceof Error ? error.message : 'Failed to parse domain from URL',
+          },
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: VerifioDomainErrorCode.EXTRACTION_FAILED,
+          message: error instanceof Error ? error.message : 'Failed to extract domain',
+        },
+      };
+    }
   }
 }

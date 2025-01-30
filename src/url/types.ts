@@ -13,6 +13,13 @@ export enum VerifioURLErrorCode {
   INVALID_TLD = 'INVALID_TLD',
 }
 
+export enum VerifioDomainErrorCode {
+  INVALID_URL = 'INVALID_URL',
+  EXTRACTION_FAILED = 'EXTRACTION_FAILED',
+  URL_VERIFICATION_FAILED = 'URL_VERIFICATION_FAILED',
+  DOMAIN_PARSE_ERROR = 'DOMAIN_PARSE_ERROR',
+}
+
 export interface VerifioURLError {
   code: VerifioURLErrorCode;
   message?: string;
@@ -28,4 +35,15 @@ export interface VerifioURLResult {
   validity: VerifioURLValidityResult;
   expandedURL?: string;
   isAccessible?: boolean;
+}
+
+export interface VerifioDomainError {
+  code: VerifioDomainErrorCode;
+  message?: string;
+}
+
+export interface VerifioDomainResult {
+  success: boolean;
+  domain?: string;
+  error?: VerifioDomainError;
 }
