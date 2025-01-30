@@ -302,7 +302,12 @@ export class VerifioURL {
       });
     }
 
-    return errors.length === 0 ? { isValid: true } : { isValid: false, errors };
+    return errors.length === 0
+      ? {
+          isValid: true,
+          normalizedURL: trimmedURL.toLowerCase(),
+        }
+      : { isValid: false, errors };
   }
 
   /**
@@ -333,7 +338,7 @@ export class VerifioURL {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return response.url;
+      return response.url.toLowerCase();
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         console.error(`Request timed out after ${timeoutMs}ms`);
@@ -365,7 +370,7 @@ export class VerifioURL {
     if (validity.isValid) {
       const expanded = await this.expand(trimmedURL);
       if (expanded) {
-        result.expandedURL = expanded;
+        result.expandedURL = expanded.toLowerCase();
         result.isAccessible = true;
       } else {
         result.isAccessible = false;
@@ -398,7 +403,9 @@ export class VerifioURL {
       }
 
       // Try to use the expanded URL first, fall back to original URL
-      const urlToProcess = verificationResult.expandedURL || verificationResult.originalURL;
+      const urlToProcess = (
+        verificationResult.expandedURL || verificationResult.originalURL
+      ).toLowerCase();
 
       try {
         // Create URL object to extract hostname

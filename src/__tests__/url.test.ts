@@ -523,7 +523,7 @@ describe('VerifioURL', () => {
         originalURL: url,
         validity: {
           isValid: true,
-          errors: undefined,
+          normalizedURL: url.toLowerCase().trim(),
         },
         expandedURL: url,
         isAccessible: true,

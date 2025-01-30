@@ -25,8 +25,15 @@ export interface VerifioURLError {
   message?: string;
 }
 
+/**
+ * Result of URL validation
+ * @property isValid - Whether the URL is valid
+ * @property normalizedURL - The URL converted to lowercase and trimmed of whitespace
+ * @property errors - Array of validation errors, if any
+ */
 export interface VerifioURLValidityResult {
   isValid: boolean;
+  normalizedURL?: string,
   errors?: VerifioURLError[];
 }
 
