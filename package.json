@@ -1,6 +1,6 @@
 {
   "name": "verifio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Smart validation and verification library for URLs, with future support for emails and more",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -40,6 +40,14 @@
     "link-expander",
     "short-url"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AashishRichhariya/verifio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AashishRichhariya/verifio/issues"
+  },
+  "homepage": "https://github.com/AashishRichhariya/verifio#readme",
   "author": "aashish-richhariya",
   "license": "MIT",
   "devDependencies": {
