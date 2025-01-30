@@ -58,10 +58,23 @@ describe('VerifioURL', () => {
         'http://example.com/%2e%2e%2f',
         'HTTP://example.com',
         'Http://example.com',
+        'http://example.com/\x0A',
 
         // Excessive components
         'http://a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s.t.u.v.w.x.y.z.com',
         'http://example.com/' + 'a'.repeat(2048),
+
+        // Whitespace cases
+        ' https://example.com',
+        'https://example.com ',
+        ' https://example.com ',
+        'https://example.com\n',
+        'https://example.com\t',
+        'https://example.com\r',
+        '\nhttps://example.com',
+        '\thttps://example.com',
+        '\rhttps://example.com',
+        ' \n\t\rhttps://example.com\n\t\r ',
       ];
 
       test.each(validURLs)('should validate correct URL: %s', (url) => {
@@ -161,7 +174,6 @@ describe('VerifioURL', () => {
 
         // Control characters
         'http://example.com/\x00',
-        'http://example.com/\x0A',
         'http://example.com/\x1F',
 
         // Invalid IP formats
@@ -367,6 +379,18 @@ describe('VerifioURL', () => {
         'https://sub-1.example.com',
         'https://sub1-sub2.example.com',
         'https://' + 'a'.repeat(63) + '.example.com',
+
+        // Whitespace cases
+        ' https://sub1.example.com',
+        'https://sub1.example.com ',
+        ' https://sub1.example.com ',
+        'https://sub1.example.com\n',
+        'https://sub1.example.com\t',
+        'https://sub1.example.com\r',
+        '\nhttps://sub1.example.com',
+        '\thttps://sub1.example.com',
+        '\rhttps://sub1.example.com',
+        ' \n\t\rhttps://sub1.example.com\n\t\r ',
       ];
 
       test.each(validLabels)('should validate correct domain label: %s', (url) => {
@@ -394,6 +418,16 @@ describe('VerifioURL', () => {
           url: 'https://sub_1.example.com',
           code: VerifioURLErrorCode.INVALID_HOSTNAME_CHARS,
           desc: 'Label contains underscore',
+        },
+        {
+          url: ' https://-sub.example.com ',
+          code: VerifioURLErrorCode.INVALID_LABEL_FORMAT,
+          desc: 'Label starts with hyphen with whitespace',
+        },
+        {
+          url: '\thttps://sub_1.example.com\n',
+          code: VerifioURLErrorCode.INVALID_HOSTNAME_CHARS,
+          desc: 'Label contains underscore with whitespace',
         },
       ];
 
@@ -728,6 +762,18 @@ describe('VerifioURL', () => {
         { input: '255.1.255.255', desc: 'second octet maximum' },
         { input: '255.255.1.255', desc: 'third octet maximum' },
         { input: '255.255.255.1', desc: 'fourth octet maximum' },
+
+        // Whitespace cases
+        { input: ' 192.168.1.1', desc: 'leading space' },
+        { input: '192.168.1.1 ', desc: 'trailing space' },
+        { input: ' 192.168.1.1 ', desc: 'both side spaces' },
+        { input: '192.168.1.1\n', desc: 'newline character' },
+        { input: '192.168.1.1\t', desc: 'tab character' },
+        { input: '192.168.1.1\r', desc: 'carriage return' },
+        { input: '\n192.168.1.1', desc: 'leading newline' },
+        { input: '\t192.168.1.1', desc: 'leading tab' },
+        { input: '\r192.168.1.1', desc: 'leading carriage return' },
+        { input: ' \n\t\r192.168.1.1\n\t\r ', desc: 'mixed whitespace' },
       ];
 
       const invalidIPv4Cases = [
@@ -760,9 +806,6 @@ describe('VerifioURL', () => {
         { input: '192. 168.1.1', desc: 'space between octets' },
 
         // Malformed strings
-        { input: '192.168.1.1\n', desc: 'newline character' },
-        { input: '192.168.1.1\t', desc: 'tab character' },
-        { input: '192.168.1.1\r', desc: 'carriage return' },
         { input: '192,168,1,1', desc: 'commas instead of dots' },
         { input: '192_168_1_1', desc: 'underscores instead of dots' },
 
@@ -824,6 +867,21 @@ describe('VerifioURL', () => {
         { input: 'fe80::1', desc: 'link-local address' },
         { input: 'ff02::1', desc: 'multicast address' },
         { input: '2001:db8::', desc: 'documentation prefix' },
+
+        // Whitespace cases
+        { input: ' 2001:0db8:85a3:0000:0000:8a2e:0370:7334', desc: 'leading space' },
+        { input: '2001:0db8:85a3:0000:0000:8a2e:0370:7334 ', desc: 'trailing space' },
+        { input: ' 2001:0db8:85a3:0000:0000:8a2e:0370:7334 ', desc: 'both side spaces' },
+        { input: '2001:0db8:85a3:0000:0000:8a2e:0370:7334\n', desc: 'newline character' },
+        { input: '2001:0db8:85a3:0000:0000:8a2e:0370:7334\t', desc: 'tab character' },
+        { input: '2001:0db8:85a3:0000:0000:8a2e:0370:7334\r', desc: 'carriage return' },
+        { input: '\n2001:0db8:85a3:0000:0000:8a2e:0370:7334', desc: 'leading newline' },
+        { input: '\t2001:0db8:85a3:0000:0000:8a2e:0370:7334', desc: 'leading tab' },
+        { input: '\r2001:0db8:85a3:0000:0000:8a2e:0370:7334', desc: 'leading carriage return' },
+        {
+          input: ' \n\t\r2001:0db8:85a3:0000:0000:8a2e:0370:7334\n\t\r ',
+          desc: 'mixed whitespace',
+        },
       ];
 
       const invalidIPv6Cases = [

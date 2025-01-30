@@ -15,10 +15,11 @@ export class VerifioURL {
    * @returns boolean indicating if the string is a valid IPv4 address
    */
   static isIPv4Address(address: string): boolean {
-    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(address)) {
+    const trimmedAddress = address.trim();
+    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(trimmedAddress)) {
       return false;
     }
-    const parts = address.split('.');
+    const parts = trimmedAddress.split('.');
     if (parts.length !== 4) {
       return false;
     }
@@ -37,16 +38,16 @@ export class VerifioURL {
    * @returns boolean indicating if the string is a valid IPv6 address
    */
   static isIPv6Address(address: string): boolean {
-    // Remove brackets if present
-    address = address.replace(/^\[|\]$/g, '');
+    // Trim and remove brackets if present
+    let trimmedAddress = address.trim().replace(/^\[|\]$/g, '');
 
-    if (address.includes(':::')) {
+    if (trimmedAddress.includes(':::')) {
       return false;
     }
 
     // Special handling for IPv4-mapped IPv6 addresses
-    if (address.toLowerCase().includes('::ffff:')) {
-      const [ipv6Part, ipv4Part] = address.split('::ffff:');
+    if (trimmedAddress.toLowerCase().includes('::ffff:')) {
+      const [ipv6Part, ipv4Part] = trimmedAddress.split('::ffff:');
 
       // Check if we have an IPv4 part
       if (!ipv4Part) {
@@ -59,21 +60,21 @@ export class VerifioURL {
           return false;
         }
         // Replace the IPv4 part with a placeholder for IPv6 validation
-        address = ipv6Part + '::ffff:0:0';
+        trimmedAddress = ipv6Part + '::ffff:0:0';
       }
     }
 
-    const compressionMarkers = address.match(/::/g);
+    const compressionMarkers = trimmedAddress.match(/::/g);
     if (compressionMarkers && compressionMarkers.length > 1) {
       return false;
     }
 
-    if (address.endsWith(':') && !address.endsWith('::')) {
+    if (trimmedAddress.endsWith(':') && !trimmedAddress.endsWith('::')) {
       return false;
     }
 
-    const parts = address.split(':');
-    const hasCompression = address.includes('::');
+    const parts = trimmedAddress.split(':');
+    const hasCompression = trimmedAddress.includes('::');
 
     if (hasCompression) {
       const actualSegments = parts.filter((p) => p !== '').length;
@@ -100,17 +101,19 @@ export class VerifioURL {
    * @returns boolean indicating if the string is a valid IP address
    */
   static isIPAddress(address: string): boolean {
-    return this.isIPv4Address(address) || this.isIPv6Address(address);
+    const trimmedAddress = address.trim();
+    return this.isIPv4Address(trimmedAddress) || this.isIPv6Address(trimmedAddress);
   }
 
   /**
    * Validates a URL and returns detailed results
    */
   static isValid(url: string): VerifioURLValidityResult {
+    const trimmedURL = url.trim();
     const errors: VerifioURLError[] = [];
 
     // Basic validation
-    if (!url) {
+    if (!trimmedURL) {
       return {
         isValid: false,
         errors: [
@@ -122,7 +125,7 @@ export class VerifioURL {
       };
     }
 
-    if (url.length > URLHelper.MAX_URL_LENGTH) {
+    if (trimmedURL.length > URLHelper.MAX_URL_LENGTH) {
       return {
         isValid: false,
         errors: [
@@ -137,10 +140,10 @@ export class VerifioURL {
     // Try parsing the URL first
     let urlObject: URL;
     try {
-      urlObject = new URL(url);
+      urlObject = new URL(trimmedURL);
     } catch (error) {
-      const ipv4Match = url.match(/\/\/([0-9.]+)/);
-      const ipv6Match = url.match(/\/\/\[([0-9a-fA-F:]+)\]/);
+      const ipv4Match = trimmedURL.match(/\/\/([0-9.]+)/);
+      const ipv6Match = trimmedURL.match(/\/\/\[([0-9a-fA-F:]+)\]/);
 
       if (ipv4Match) {
         const ipAddress = ipv4Match[1];
@@ -292,7 +295,7 @@ export class VerifioURL {
     }
 
     // Final URL pattern validation
-    if (!URLHelper.URL_PATTERN.test(url)) {
+    if (!URLHelper.URL_PATTERN.test(trimmedURL)) {
       errors.push({
         code: VerifioURLErrorCode.INVALID_URL,
         message: 'URL format is invalid',
@@ -309,6 +312,7 @@ export class VerifioURL {
    * @returns The expanded URL or null if expansion fails
    */
   static async expand(url: string, timeoutMs: number = 5000): Promise<string | null> {
+    const trimmedURL = url.trim();
     if (timeoutMs <= 0) {
       throw new Error('Timeout must be greater than 0 milliseconds');
     }
@@ -319,7 +323,7 @@ export class VerifioURL {
     }, timeoutMs);
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(trimmedURL, {
         method: 'HEAD',
         redirect: 'follow',
         signal: controller.signal,
@@ -348,17 +352,18 @@ export class VerifioURL {
    * Full URL verification including expansion and accessibility check
    */
   static async verify(url: string): Promise<VerifioURLResult> {
-    const validity = this.isValid(url);
+    const trimmedURL = url.trim();
+    const validity = this.isValid(trimmedURL);
 
     const result: VerifioURLResult = {
-      originalURL: url,
+      originalURL: trimmedURL,
       validity,
       expandedURL: undefined,
       isAccessible: undefined,
     };
 
     if (validity.isValid) {
-      const expanded = await this.expand(url);
+      const expanded = await this.expand(trimmedURL);
       if (expanded) {
         result.expandedURL = expanded;
         result.isAccessible = true;
@@ -376,9 +381,10 @@ export class VerifioURL {
    * @returns Promise<VerifloDomainResult>
    */
   static async extractDomain(url: string): Promise<VerifioDomainResult> {
+    const trimmedURL = url.trim();
     try {
       // First verify the URL
-      const verificationResult = await this.verify(url);
+      const verificationResult = await this.verify(trimmedURL);
 
       // If URL is invalid, return early with error
       if (!verificationResult.validity.isValid) {
